@@ -63,6 +63,8 @@
 #include "os_task.h"
 #include "os_semphr.h"
 
+#include <string.h>
+
 #define UART        sciREG1
 #define AHRS        sciREG3
 
@@ -72,6 +74,39 @@
 #define REAL_UPPERBASE  (1500)
 #define REAL_DOWNBASE   (1420)
 #define REAL_INC        (5)
+
+#define D_COUNT         (8)
+#define D_SIZE          (8)
+
+#define AUTO_LEFT       (1)
+#define AUTO_RIGHT      (2)
+#define AUTO_FORWARD    (3)
+#define AUTO_BACKWARD   (4)
+#define AUTO_STOP       (5)
+#define COLLISION       (6)
+
+#define LEFT_LIGHT      (7)
+#define RIGHT_LIGHT     (8)
+#define FRONT_LIGHT     (9)
+#define BREAK_LIGHT     (10)
+
+#define FM_RADIO        (11)
+
+#define MAN_SERVO       (12)
+#define MAN_BLDC        (13)
+
+#define OBSTACLE        (15)
+#define LIDAR           (16)
+
+#define TRANSITION      (33)
+#define ALL_STOP        (44)
+
+uint32 cnt = 0;
+uint32 error = 0;
+uint32 tx_done = 0;
+
+uint8_t tx_data[D_COUNT] = {1, 2, 3, 4, 4, 3, 2, 1};
+uint8_t rx_data[D_COUNT] = {0};
 
 SemaphoreHandle_t sem;
 
@@ -123,6 +158,7 @@ void init_peripheral(void)
 {
     sciInit();
 
+#if 0
     ecapInit();
     ecapStartCounter(ecapREG1);
     ecapStartCounter(ecapREG2);
@@ -136,6 +172,7 @@ void init_peripheral(void)
     ecapEnableCapture(ecapREG4);
     ecapEnableCapture(ecapREG5);
     ecapEnableCapture(ecapREG6);
+#endif
 
     etpwmInit();
     etpwmStartTBCLK();
@@ -173,7 +210,127 @@ void ecap_control(void)     // channel 7
     control = (cap[1] - cap[0]) / VCLK3_FREQ;
 }
 
-void uart_task(void *pvPrameters)
+void can_decision_task(void *pvParameters)
+{
+    for(;;)
+    {
+        if(xSemaphoreTake(sem, (TickType_t) 0x01) == pdTRUE)
+        {
+            switch(rx_data[0])
+            {
+                case AUTO_LEFT:
+                    disp_set("Auto Left Turn Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case AUTO_RIGHT:
+                    disp_set("Auto Right Turn Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case AUTO_FORWARD:
+                    disp_set("Auto Forward Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case AUTO_BACKWARD:
+                    disp_set("Auto Backward Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case AUTO_STOP:
+                    disp_set("Auto Stop Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case COLLISION:
+                    disp_set("Collision Warning Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case LEFT_LIGHT:
+                    disp_set("Left Light Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case RIGHT_LIGHT:
+                    disp_set("Right Light Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case FRONT_LIGHT:
+                    disp_set("Front Light Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case BREAK_LIGHT:
+                    disp_set("Break Light Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case FM_RADIO:
+                    disp_set("FM Radio Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case MAN_SERVO:
+                    disp_set("Manual Servo Control Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case MAN_BLDC:
+                    disp_set("Manual BLDC Control Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case OBSTACLE:
+                    disp_set("Obstacle Detection Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case LIDAR:
+                    disp_set("Lidar Summary Data Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case TRANSITION:
+                    disp_set("Change Auto / Manual Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+
+                case ALL_STOP:
+                    disp_set("All Stop Instruction\n\r\0");
+                    xSemaphoreGive(sem);
+                    vTaskDelay(250);
+                    break;
+            }
+
+
+            xSemaphoreGive(sem);
+            //vTaskDelay(30);
+            //vTaskDelay(250);
+            vTaskDelay(30);
+        }
+    }
+}
+
+void uart_task(void *pvParameters)
 {
     //int gear;
     //int real;
@@ -181,12 +338,11 @@ void uart_task(void *pvPrameters)
 
     for(;;)
     {
-        ecap_throttle();
-        ecap_steer();
-        ecap_control();
-
         if(xSemaphoreTake(sem, (TickType_t) 0x01) == pdTRUE)
         {
+            ecap_throttle();
+            ecap_steer();
+            ecap_control();
 #if 0
             gear = ((throttle - THRO_BASE) / THRO_INC) + 1;
 
@@ -250,18 +406,8 @@ void bldc_task(void *pvParameters)
     {
         if(xSemaphoreTake(sem, (TickType_t) 0x01) == pdTRUE)
         {
-            ecap_throttle();
+            // ecap_throttle();
 
-            /* motor 스펙이 매우 높아 2000 을 모두 먹이면 너무 빠르다.
-             * scale 팩터를 적절하게 입혀서 그 사이의 레벨값으로 속도를 조정한다.
-             * gear 레벨을 11 개 정도로 설정하도록 한다.
-             * gear 레벨은 1 ~ 11 까지고 6 번이 중립 기어다.
-             * throttle 의 원본값은 1000 ~ 2000 이므로 0 ~ 1000 을 100 으로 나누면 0 ~ 10 이 된다.
-             * gear 1 ~ 5 는 후진이며 7 ~ 11 은 전진에 해당한다.
-             * min = 1350, max = 1650 로 gear 값 별로 실제 throttle 은 아래와 같다.
-             * 1 = 1430, 2 = 1440, 3 = 1450, 4 = 1460, 5 = 1470
-             * 7 = 1530, 8 = 1540, 9 = 1550, 10 = 1560, 11 = 1570
-             * pwm 값은 상황에 따라 적절히 유도리 있게 변경하여 사용하도록 한다. */
 #if 0
             cur = throttle;
 
@@ -312,7 +458,7 @@ void steering_task(void *pvParameters)
     {
         if(xSemaphoreTake(sem, (TickType_t) 0x01) == pdTRUE)
         {
-            ecap_steer();
+            // ecap_steer();
 
 #if 0
             if(steer >= 900 && steer < 1200)
@@ -341,19 +487,6 @@ void steering_task(void *pvParameters)
             }
 #endif
 
-            /* servo의 좌측은 중립이 1900 정도여야함
-               servo의 우측은 중립이 1100 정도여야함
-               1500 to 1900, 1500 to 1100
-               range 1000 ~ 2000 - 문제는 1500 인 중립상태가 중립에 있지 않다는것!
-
-               steer = 1500, left = 1900, right = 1100
-               steer = 1900(우회전), left = 1900, right = 1900
-               steer = 1100(좌회전), left = 1100, right = 1100
-               steer = 1700(우회전), left = 1900, right = 1700
-               steer = 1300(좌회전), left = 1300, right = 1100
-
-               bit operator를 활용해서 고속으로 32 배수 단위로 정렬한다.
-               */
             steer &= ~(32 - 1);
             if(1472 <= steer && steer <= 1536)
             {
@@ -393,8 +526,8 @@ int main(void)
     sem = xSemaphoreCreateBinary();
     xSemaphoreGive(sem);
 
-#if 0
-    if(xTaskCreate(can_task, "can", configMINIMAL_STACK_SIZE * 2,
+#if 1
+    if(xTaskCreate(can_decision_task, "can_decision", configMINIMAL_STACK_SIZE * 2,
                    NULL, 5, &dsp_can_fd) != pdPASS)
     {
         for(;;)
@@ -402,7 +535,7 @@ int main(void)
     }
 #endif
 
-#if 1
+#if 0
     if(xTaskCreate(bldc_task, "bldc", configMINIMAL_STACK_SIZE * 2,
                    NULL, 5, &bldc_fd) != pdPASS)
     {
@@ -411,7 +544,7 @@ int main(void)
     }
 #endif
 
-#if 1
+#if 0
     if(xTaskCreate(steering_task, "steering", configMINIMAL_STACK_SIZE,
                    NULL, 5, &steer_fd) != pdPASS)
     {
@@ -420,7 +553,7 @@ int main(void)
     }
 #endif
 
-#if 1
+#if 0
     if(xTaskCreate(uart_task, "uart", configMINIMAL_STACK_SIZE * 2,
                    NULL, 5, &uart_fd) != pdPASS)
     {
@@ -465,4 +598,9 @@ int main(void)
 
 
 /* USER CODE BEGIN (4) */
+void canMessageNotification(canBASE_t *node, uint32_t messageBox)
+{
+    if(canIsRxMessageArrived(canREG1, canMESSAGE_BOX2))
+        canGetData(node, messageBox, rx_data);
+}
 /* USER CODE END */
